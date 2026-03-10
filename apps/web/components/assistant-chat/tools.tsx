@@ -12,8 +12,15 @@ import type {
   ManageInboxTool,
 } from "@/utils/ai/assistant/chat";
 import { isDefined } from "@/utils/types";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallbackColor } from "@/components/ui/avatar";
 import {
   ChevronRightIcon,
   EyeIcon,
@@ -22,6 +29,10 @@ import {
   FileDiffIcon,
   ExternalLinkIcon,
   Loader2,
+  PencilIcon,
+  CopyIcon,
+  CheckIcon,
+  SendIcon,
 } from "lucide-react";
 import { toastError, toastSuccess } from "@/components/Toast";
 import { Tooltip } from "@/components/Tooltip";
@@ -42,10 +53,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
-export type ThreadLookup = Map<
-  string,
-  { subject: string; from: string; snippet: string }
->;
+export type ThreadLookup =
+  import("@/components/assistant-chat/email-lookup-context").EmailLookup;
 
 function getOutputField<T>(output: unknown, field: string): T | undefined {
   if (typeof output === "object" && output !== null && field in output) {
@@ -413,6 +422,8 @@ function EmailActionResult({
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmationResultOverride, setConfirmationResultOverride] =
     useState<EmailConfirmationResult | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const pendingAction = getOutputField<Record<string, unknown>>(
     output,
@@ -451,10 +462,10 @@ function EmailActionResult({
     output,
     key: "subject",
   });
-  const referenceFrom = getPendingString(reference, "from");
   const referenceSubject = getPendingString(reference, "subject");
   const displaySubject = subject || referenceSubject;
   const body = getActionBodyText({ actionType, pendingAction });
+  const [editedBody, setEditedBody] = useState(body || "");
 
   const messageId =
     confirmationResult?.messageId ||
@@ -470,116 +481,206 @@ function EmailActionResult({
     userEmail,
     provider,
   });
-  const summary = getEmailActionSummary({
-    actionType,
-    isConfirmed,
-    isProcessing,
-    to: confirmationResult?.to || to,
-  });
+
+  const actionLabel = getEmailActionLabel(actionType);
+  const recipientInitial = to ? to.charAt(0).toUpperCase() : "?";
+  const providerName = provider === "microsoft" ? "Outlook" : "Gmail";
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(editedBody || body || "").catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSend = async () => {
+    setIsConfirming(true);
+    try {
+      if (!chatId) {
+        toastError({ description: "Could not confirm this email action." });
+        return;
+      }
+
+      const hasEdits = editedBody && editedBody !== body;
+      const result = await confirmAssistantEmailAction(emailAccountId, {
+        chatId,
+        chatMessageId,
+        toolCallId,
+        actionType,
+        ...(hasEdits ? { contentOverride: editedBody } : {}),
+      });
+
+      if (result?.serverError) {
+        toastError({ description: result.serverError });
+        return;
+      }
+
+      const parsed = parseConfirmationResult(result?.data?.confirmationResult);
+      if (!parsed) {
+        toastError({ description: "Could not confirm this email action." });
+        return;
+      }
+
+      setConfirmationResultOverride(parsed);
+      toastSuccess({
+        description: getAssistantEmailSuccessMessage(actionType),
+      });
+    } catch {
+      toastError({ description: "Could not confirm this email action." });
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const sentLabel = isConfirmed
+    ? getEmailActionSentLabel(actionType)
+    : actionLabel;
 
   return (
-    <CollapsibleToolCard summary={summary} initialOpen={!isConfirmed}>
-      <div className="space-y-2 text-sm">
-        {to && <ToolDetailRow label="To" value={to} />}
-        {cc && <ToolDetailRow label="CC" value={cc} />}
-        {bcc && <ToolDetailRow label="BCC" value={bcc} />}
+    <Card>
+      <CardHeader className="flex flex-row items-center gap-3 space-y-0 border-b px-4 py-3.5">
+        <Avatar className="size-8">
+          <AvatarFallbackColor content={recipientInitial} className="text-xs" />
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold leading-tight">
+            {sentLabel ? `${sentLabel} ` : ""}
+            {to}
+          </div>
+          {cc && (
+            <div className="mt-0.5 text-xs text-muted-foreground">CC: {cc}</div>
+          )}
+          {bcc && (
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              BCC: {bcc}
+            </div>
+          )}
+        </div>
+        {isConfirmed && (
+          <div className="flex items-center gap-1 text-xs font-medium text-green-600">
+            <CheckIcon className="size-3.5" />
+            Sent
+          </div>
+        )}
+      </CardHeader>
+
+      <CardContent className="p-0">
         {displaySubject && (
-          <ToolDetailRow label="Subject" value={displaySubject} />
-        )}
-        {referenceFrom && actionType !== "send_email" && (
-          <ToolDetailRow
-            label={actionType === "reply_email" ? "In reply to" : "From"}
-            value={referenceFrom}
-          />
-        )}
-        {body && (
-          <div className="space-y-1">
-            <div className="text-xs font-medium text-muted-foreground">
-              Message
-            </div>
-            <div className="rounded-md bg-muted p-2 text-xs">
-              <div className="break-words whitespace-pre-wrap">{body}</div>
-            </div>
+          <div className="flex items-center gap-2 border-b px-4 py-2.5">
+            <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Subject
+            </span>
+            <span className="truncate text-sm font-medium text-foreground">
+              {actionType !== "send_email" ? "Re: " : ""}
+              {displaySubject}
+            </span>
           </div>
         )}
 
-        {(externalUrl || (requiresConfirmation && !isConfirmed)) && (
-          <div className="flex items-center gap-2">
-            {externalUrl && (
-              <ToolExternalLink href={externalUrl}>
-                Open in {provider === "microsoft" ? "Outlook" : "Gmail"}
-              </ToolExternalLink>
-            )}
+        <div className="px-4 py-3.5">
+          {isEditing ? (
+            <div className="space-y-2">
+              <Textarea
+                value={editedBody}
+                onChange={(e) => setEditedBody(e.target.value)}
+                className="min-h-[140px] resize-y text-sm leading-relaxed"
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditedBody(body || "");
+                    setIsEditing(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={() => setIsEditing(false)}>
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+              {editedBody || body}
+            </div>
+          )}
+        </div>
+      </CardContent>
 
-            {requiresConfirmation && !isConfirmed && (
+      {!isEditing && (
+        <CardFooter className="flex items-center justify-between border-t px-4 py-3">
+          <div className="flex items-center gap-1">
+            {!isConfirmed && requiresConfirmation && (
               <Button
+                variant="ghost"
                 size="sm"
-                className="w-fit"
-                disabled={isConfirming || isProcessing || isChatBusy}
-                onClick={async () => {
-                  setIsConfirming(true);
-                  try {
-                    if (!chatId) {
-                      toastError({
-                        description: "Could not confirm this email action.",
-                      });
-                      return;
-                    }
-
-                    const result = await confirmAssistantEmailAction(
-                      emailAccountId,
-                      {
-                        chatId,
-                        chatMessageId,
-                        toolCallId,
-                        actionType,
-                      },
-                    );
-
-                    if (result?.serverError) {
-                      toastError({ description: result.serverError });
-                      return;
-                    }
-
-                    const confirmationResult = parseConfirmationResult(
-                      result?.data?.confirmationResult,
-                    );
-                    if (!confirmationResult) {
-                      toastError({
-                        description: "Could not confirm this email action.",
-                      });
-                      return;
-                    }
-
-                    setConfirmationResultOverride(confirmationResult);
-                    toastSuccess({
-                      description: getAssistantEmailSuccessMessage(actionType),
-                    });
-                  } catch {
-                    toastError({
-                      description: "Could not confirm this email action.",
-                    });
-                  } finally {
-                    setIsConfirming(false);
-                  }
-                }}
+                className="h-8 gap-1.5 text-xs text-muted-foreground"
+                onClick={() => setIsEditing(true)}
               >
-                {isProcessing ? (
-                  "Sending..."
-                ) : isConfirming ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  "Send"
-                )}
+                <PencilIcon className="size-3.5" />
+                <span className="hidden sm:inline">Edit</span>
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-8 gap-1.5 text-xs ${
+                copied ? "text-green-600" : "text-muted-foreground"
+              }`}
+              onClick={handleCopy}
+            >
+              {copied ? (
+                <CheckIcon className="size-3.5" />
+              ) : (
+                <CopyIcon className="size-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {copied ? "Copied" : "Copy"}
+              </span>
+            </Button>
+            {externalUrl && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-xs text-muted-foreground"
+                asChild
+              >
+                <a href={externalUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLinkIcon className="size-3.5" />
+                  <span className="hidden sm:inline">
+                    Open in {providerName}
+                  </span>
+                </a>
               </Button>
             )}
           </div>
-        )}
-      </div>
-    </CollapsibleToolCard>
+
+          {!isConfirmed && requiresConfirmation && (
+            <Button
+              onClick={handleSend}
+              disabled={isConfirming || isProcessing || isChatBusy}
+              size="sm"
+              className="gap-2"
+            >
+              {isProcessing ? (
+                "Sending..."
+              ) : isConfirming ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <SendIcon className="hidden size-3.5 sm:inline" />
+                  Send
+                </>
+              )}
+            </Button>
+          )}
+        </CardFooter>
+      )}
+    </Card>
   );
 }
 
@@ -1269,6 +1370,18 @@ function getEmailActionSummary({
   if (actionType === "send_email") return `Sent email${to ? ` to ${to}` : ""}`;
   if (actionType === "reply_email") return "Sent reply";
   return `Forwarded email${to ? ` to ${to}` : ""}`;
+}
+
+function getEmailActionLabel(actionType: PendingEmailActionType) {
+  if (actionType === "reply_email") return "Reply to";
+  if (actionType === "forward_email") return "Forward to";
+  return "";
+}
+
+function getEmailActionSentLabel(actionType: PendingEmailActionType) {
+  if (actionType === "send_email") return "Sent email to";
+  if (actionType === "reply_email") return "Replied to";
+  return "Forwarded to";
 }
 
 function getAssistantEmailSuccessMessage(actionType: PendingEmailActionType) {

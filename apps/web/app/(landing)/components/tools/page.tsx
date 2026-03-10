@@ -185,74 +185,77 @@ export default function ToolsPage() {
 
 function AssistantEmailActionStates() {
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       <MutedText>Email action states:</MutedText>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-2">
-          <MutedText>Send</MutedText>
-          <SendEmailResult
-            output={getAssistantSendEmailOutput("pending")}
-            chatMessageId="assistant-demo-send-pending"
-            toolCallId="assistant-demo-send-pending"
-            disableConfirm={true}
-          />
-          <SendEmailResult
-            output={getAssistantSendEmailOutput("processing")}
-            chatMessageId="assistant-demo-send-processing"
-            toolCallId="assistant-demo-send-processing"
-            disableConfirm={true}
-          />
-          <SendEmailResult
-            output={getAssistantSendEmailOutput("confirmed")}
-            chatMessageId="assistant-demo-send-confirmed"
-            toolCallId="assistant-demo-send-confirmed"
-            disableConfirm={true}
-          />
-        </div>
 
-        <div className="space-y-2">
-          <MutedText>Reply</MutedText>
-          <ReplyEmailResult
-            output={getAssistantReplyEmailOutput("pending")}
-            chatMessageId="assistant-demo-reply-pending"
-            toolCallId="assistant-demo-reply-pending"
-            disableConfirm={true}
-          />
-          <ReplyEmailResult
-            output={getAssistantReplyEmailOutput("processing")}
-            chatMessageId="assistant-demo-reply-processing"
-            toolCallId="assistant-demo-reply-processing"
-            disableConfirm={true}
-          />
-          <ReplyEmailResult
-            output={getAssistantReplyEmailOutput("confirmed")}
-            chatMessageId="assistant-demo-reply-confirmed"
-            toolCallId="assistant-demo-reply-confirmed"
-            disableConfirm={true}
-          />
-        </div>
+      <div className="space-y-3">
+        <MutedText>Send — pending</MutedText>
+        <SendEmailResult
+          output={getAssistantSendEmailOutput("pending")}
+          chatMessageId="assistant-demo-send-pending"
+          toolCallId="assistant-demo-send-pending"
+          disableConfirm={true}
+        />
+      </div>
 
-        <div className="space-y-2">
-          <MutedText>Forward</MutedText>
-          <ForwardEmailResult
-            output={getAssistantForwardEmailOutput("pending")}
-            chatMessageId="assistant-demo-forward-pending"
-            toolCallId="assistant-demo-forward-pending"
-            disableConfirm={true}
-          />
-          <ForwardEmailResult
-            output={getAssistantForwardEmailOutput("processing")}
-            chatMessageId="assistant-demo-forward-processing"
-            toolCallId="assistant-demo-forward-processing"
-            disableConfirm={true}
-          />
-          <ForwardEmailResult
-            output={getAssistantForwardEmailOutput("confirmed")}
-            chatMessageId="assistant-demo-forward-confirmed"
-            toolCallId="assistant-demo-forward-confirmed"
-            disableConfirm={true}
-          />
-        </div>
+      <div className="space-y-3">
+        <MutedText>Send — processing</MutedText>
+        <SendEmailResult
+          output={getAssistantSendEmailOutput("processing")}
+          chatMessageId="assistant-demo-send-processing"
+          toolCallId="assistant-demo-send-processing"
+          disableConfirm={true}
+        />
+      </div>
+
+      <div className="space-y-3">
+        <MutedText>Send — confirmed</MutedText>
+        <SendEmailResult
+          output={getAssistantSendEmailOutput("confirmed")}
+          chatMessageId="assistant-demo-send-confirmed"
+          toolCallId="assistant-demo-send-confirmed"
+          disableConfirm={true}
+        />
+      </div>
+
+      <div className="space-y-3">
+        <MutedText>Reply — pending</MutedText>
+        <ReplyEmailResult
+          output={getAssistantReplyEmailOutput("pending")}
+          chatMessageId="assistant-demo-reply-pending"
+          toolCallId="assistant-demo-reply-pending"
+          disableConfirm={true}
+        />
+      </div>
+
+      <div className="space-y-3">
+        <MutedText>Reply — confirmed</MutedText>
+        <ReplyEmailResult
+          output={getAssistantReplyEmailOutput("confirmed")}
+          chatMessageId="assistant-demo-reply-confirmed"
+          toolCallId="assistant-demo-reply-confirmed"
+          disableConfirm={true}
+        />
+      </div>
+
+      <div className="space-y-3">
+        <MutedText>Forward — pending</MutedText>
+        <ForwardEmailResult
+          output={getAssistantForwardEmailOutput("pending")}
+          chatMessageId="assistant-demo-forward-pending"
+          toolCallId="assistant-demo-forward-pending"
+          disableConfirm={true}
+        />
+      </div>
+
+      <div className="space-y-3">
+        <MutedText>Forward — confirmed</MutedText>
+        <ForwardEmailResult
+          output={getAssistantForwardEmailOutput("confirmed")}
+          chatMessageId="assistant-demo-forward-confirmed"
+          toolCallId="assistant-demo-forward-confirmed"
+          disableConfirm={true}
+        />
       </div>
     </div>
   );
@@ -265,25 +268,34 @@ function getAssistantToolThreadLookup(): ThreadLookup {
     [
       "thread-1",
       {
+        messageId: "msg-1",
         from: "Daily Updates <updates@example.com>",
         subject: "Daily summary",
         snippet: "Your summary is ready",
+        date: "2026-03-09T10:00:00Z",
+        isUnread: true,
       },
     ],
     [
       "thread-2",
       {
+        messageId: "msg-2",
         from: "Product Team <product@example.com>",
         subject: "Release notes",
         snippet: "New changes shipped today",
+        date: "2026-03-09T09:00:00Z",
+        isUnread: false,
       },
     ],
     [
       "thread-3",
       {
+        messageId: "msg-3",
         from: "Support <support@example.com>",
         subject: "Ticket follow-up",
         snippet: "Checking in on your request",
+        date: "2026-03-08T15:00:00Z",
+        isUnread: true,
       },
     ],
   ]);
